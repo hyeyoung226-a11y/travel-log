@@ -6,9 +6,6 @@
     <title>대장님의 실시간 여행 기록소</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <!-- Firebase SDK (v9 Compat) -->
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
     <style>
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
         body { font-family: 'Pretendard', sans-serif; background-color: #f8fafc; color: #0f172a; }
@@ -30,7 +27,7 @@
                 <h1 class="text-lg font-bold tracking-tight leading-none text-slate-900">대장님의 여행 기록소</h1>
                 <div class="flex items-center space-x-1.5 mt-1">
                     <span id="syncStatus" class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <p id="syncStatusText" class="text-xs text-slate-500">Firebase 실시간 연동 완료</p>
+                    <p class="text-xs text-slate-500">Firebase 실시간 연동 완료</p>
                 </div>
             </div>
         </div>
@@ -76,10 +73,7 @@
 
         <!-- Main Content Area -->
         <div id="mainTripContainer">
-            <div class="text-center py-12 text-slate-400 text-sm">
-                <i class="fa-solid fa-circle-notch fa-spin text-2xl mb-2 text-blue-500"></i>
-                <p>클라우드 데이터를 불러오는 중입니다...</p>
-            </div>
+            <!-- Dynamic Content -->
         </div>
 
     </main>
@@ -131,7 +125,7 @@
 
     <!-- Modal: Add Schedule Item -->
     <div id="addItemModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 hidden transition-opacity">
-        <div class="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl space-y-4">
+        <div class="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center pb-2 border-b border-slate-100">
                 <h3 class="text-base font-bold text-slate-900">일정 / 장소 추가</h3>
                 <button onclick="closeModal('addItemModal')" class="text-slate-400 hover:text-slate-600">
@@ -168,8 +162,12 @@
                     <input type="text" id="itemTitle" required placeholder="예: 동항 이탈리아 수성 야경 감상" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">메모 / 꿀팁</label>
-                    <input type="text" id="itemNote" placeholder="예: 분수쇼 시간 확인 필수" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">📍 주소 한줄</label>
+                    <input type="text" id="itemAddress" placeholder="예: 中山区 中山广场 1호 (고덕지도 명칭 등)" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">💡 메모 한줄</label>
+                    <input type="text" id="itemNote" placeholder="예: 음악 분수쇼 19:30 시작 / 예산 약 100위안" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
                 <button type="submit" class="w-full bg-blue-600 text-white font-semibold py-3 rounded-xl hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all mt-2">
                     실시간 추가하기
@@ -178,9 +176,11 @@
         </div>
     </div>
 
-    <!-- Firebase Script Logic -->
-    <script>
-        // 대장님의 Firebase 설정 정보
+    <!-- Firebase SDK Module -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, onSnapshot, doc, setDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
         const firebaseConfig = {
             apiKey: "AIzaSyAPgadPS4n65v7t_Xsg4kOzduW-54bs0-U",
             authDomain: "my-log-953f5.firebaseapp.com",
@@ -191,9 +191,8 @@
             measurementId: "G-XWMM09791L"
         };
 
-        // Initialize Firebase
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.firestore();
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
 
         let trips = [];
         let activeTripId = '';
@@ -207,6 +206,7 @@
             hotel: 'Novotel Dalian Zhongshan Square',
             flightOut: 'OZ301 (09:35 출발)',
             flightIn: 'OZ302 (11:00 출발)',
+            memoText: '• 택시 탈 때 고덕지도 화면 보여주기\n• 백화점 상권 시안루(西安路) 추천 맛집 체크\n• 비상금 및 현금 별도 보관',
             checklists: [
                 { id: 1, text: '여권 & 중국 비자 확인', done: true },
                 { id: 2, text: '트래블로그 / 현금 환전', done: true },
@@ -214,53 +214,37 @@
                 { id: 4, text: '돼지코 변환 플러그 챙기기', done: false }
             ],
             items: [
-                { id: 101, day: 1, time: '09:35', title: '인천공항 출발 (OZ301)', category: '이동', note: '시차 -1시간 반영' },
-                { id: 102, day: 1, time: '11:30', title: '노보텔 체크인 & 짐 보관', category: '이동', note: '중산광장 근처 위치' },
-                { id: 103, day: 1, time: '13:30', title: '러시아 거리 탐방', category: '관광', note: '유럽풍 건축물 구경' },
-                { id: 104, day: 1, time: '17:00', title: '동항 이탈리아 수성 & 음악분수', category: '관광', note: '운하 야경 산책 코스' },
-                { id: 105, day: 2, time: '09:00', title: '연화산 전망대 모노레일', category: '관광', note: '다롄 전경 감상' },
-                { id: 106, day: 2, time: '14:00', title: '성해광장 (大连星海广场)', category: '관광', note: '동양 최대 규모 광장' },
-                { id: 107, day: 2, time: '18:00', title: '밍지카오위 (카오위 맛집)', category: '맛집', note: '시안루 상권 방문' },
-                { id: 108, day: 3, time: '10:00', title: '동관지에 근대 거리 산책', category: '관광', note: '레트로 분위기 스팟' },
-                { id: 109, day: 3, time: '18:30', title: '시안루 야시장 투어', category: '맛집', note: '길거리 야식 체험' }
+                { id: 101, day: 1, time: '09:35', title: '인천공항 출발 (OZ301)', category: '이동', address: '인천 중구 공항로 272', note: '시차 -1시간 반영 / 약 1시간 25분 소요' },
+                { id: 102, day: 1, time: '11:30', title: '노보텔 체크인 & 짐 보관', category: '이동', address: '中山区 玉光街 7号', note: '중산광장 도보 3분 거리' },
+                { id: 103, day: 1, time: '13:30', title: '러시아 거리 탐방', category: '관광', address: '中山区 胜利桥北', note: '유럽풍 건축물 산책 및 사진 촬영' },
+                { id: 104, day: 1, time: '17:00', title: '동항 이탈리아 수성 & 음악분수', category: '관광', address: '中山区 港浦路', note: '운하 야경 감상 / 분수쇼 시간 확인' },
+                { id: 105, day: 2, time: '09:00', title: '연화산 전망대 모노레일', category: '관광', address: '西岗区 滨海西路', note: '다롄 전경 및 서해안 해변 감상' },
+                { id: 106, day: 2, time: '14:00', title: '성해광장 (大连星海广场)', category: '관광', address: '沙河口区 星海广场', note: '동양 최대 규모 광장 / 바다 산책' },
+                { id: 107, day: 2, time: '18:00', title: '밍지카오위 (카오위 맛집)', category: '맛집', address: '沙河口区 西安路 Roosevelt Center 4F', note: '농어(海鲈鱼) 마라 맛 추천' },
+                { id: 108, day: 3, time: '10:00', title: '동관지에 근대 거리 산책', category: '관광', address: '西岗区 东关街', note: '레트로 분위기 핫플레이스' },
+                { id: 109, day: 3, time: '18:30', title: '시안루 야시장 투어', category: '맛집', address: '沙河口区 长兴街', note: '길거리 야식 및 꿔바로우 맛보기' }
             ]
         };
 
-        // Realtime Database Sync Listener
-        db.collection("trips").onSnapshot((snapshot) => {
+        // Realtime Listener Connection
+        const tripsRef = collection(db, "trips");
+        onSnapshot(tripsRef, (snapshot) => {
             const fetchedTrips = [];
             snapshot.forEach(doc => fetchedTrips.push(doc.data()));
             
             if (fetchedTrips.length === 0) {
-                db.collection("trips").doc(defaultSeedTrip.id).set(defaultSeedTrip);
+                setDoc(doc(db, "trips", defaultSeedTrip.id), defaultSeedTrip);
                 trips = [defaultSeedTrip];
             } else {
                 trips = fetchedTrips;
             }
 
             if (!activeTripId && trips.length > 0) activeTripId = trips[0].id;
-            
-            document.getElementById('syncStatus').className = "inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse";
-            document.getElementById('syncStatusText').innerText = "Firebase 실시간 연동 완료";
-            render();
-        }, (error) => {
-            console.error("Firestore error:", error);
-            document.getElementById('syncStatus').className = "inline-block w-2 h-2 rounded-full bg-amber-500";
-            document.getElementById('syncStatusText').innerText = "로컬 모드로 동작 중";
-            
-            // Fallback to local data if network or Firestore rules block
-            if (trips.length === 0) trips = [defaultSeedTrip];
-            if (!activeTripId && trips.length > 0) activeTripId = trips[0].id;
             render();
         });
 
         async function syncTripToCloud(trip) {
-            try {
-                await db.collection("trips").doc(trip.id).set(trip);
-            } catch (err) {
-                console.error("Error saving to cloud:", err);
-                render();
-            }
+            await setDoc(doc(db, "trips", trip.id), trip);
         }
 
         window.openModal = (id) => document.getElementById(id).classList.remove('hidden');
@@ -286,6 +270,7 @@
                 hotel: document.getElementById('tripHotel').value || '숙소 미정',
                 flightOut: document.getElementById('flightOut').value || '미정',
                 flightIn: document.getElementById('flightIn').value || '미정',
+                memoText: '',
                 checklists: [
                     { id: Date.now()+1, text: '여권 챙기기', done: false },
                     { id: Date.now()+2, text: '환전 / 결제 카드 챙기기', done: false }
@@ -311,10 +296,10 @@
                 time: document.getElementById('itemTime').value || '시간 미정',
                 title: document.getElementById('itemTitle').value,
                 category: document.getElementById('itemCategory').value,
-                note: document.getElementById('itemNote').value
+                address: document.getElementById('itemAddress').value || '',
+                note: document.getElementById('itemNote').value || ''
             };
 
-            if (!trip.items) trip.items = [];
             trip.items.push(newItem);
             trip.items.sort((a,b) => a.day - b.day || a.time.localeCompare(b.time));
             closeModal('addItemModal');
@@ -322,10 +307,19 @@
             await syncTripToCloud(trip);
         };
 
+        window.saveTripMemo = async () => {
+            const trip = trips.find(t => t.id === activeTripId);
+            if (!trip) return;
+            const text = document.getElementById('tripMemoInput').value;
+            trip.memoText = text;
+            await syncTripToCloud(trip);
+            alert('메모가 실시간 저장되었습니다!');
+        };
+
         window.toggleChecklist = async (checkId) => {
             const trip = trips.find(t => t.id === activeTripId);
             if (!trip) return;
-            const check = (trip.checklists || []).find(c => c.id === checkId);
+            const check = trip.checklists.find(c => c.id === checkId);
             if (check) check.done = !check.done;
             await syncTripToCloud(trip);
         };
@@ -334,7 +328,6 @@
             if (e.key === 'Enter' && e.target.value.trim()) {
                 const trip = trips.find(t => t.id === activeTripId);
                 if (!trip) return;
-                if (!trip.checklists) trip.checklists = [];
                 trip.checklists.push({ id: Date.now(), text: e.target.value.trim(), done: false });
                 e.target.value = '';
                 await syncTripToCloud(trip);
@@ -344,7 +337,7 @@
         window.deleteItem = async (itemId) => {
             const trip = trips.find(t => t.id === activeTripId);
             if (!trip) return;
-            trip.items = (trip.items || []).filter(i => i.id !== itemId);
+            trip.items = trip.items.filter(i => i.id !== itemId);
             await syncTripToCloud(trip);
         };
 
@@ -404,6 +397,9 @@
                         <button onclick="setSubTab('checklist')" class="tab-btn pb-2.5 px-4 ${currentTab === 'checklist' ? 'active' : 'text-slate-500'}">
                             <i class="fa-solid fa-list-check mr-1"></i> 체크리스트 (${(trip.checklists||[]).filter(c=>c.done).length}/${(trip.checklists||[]).length})
                         </button>
+                        <button onclick="setSubTab('memo')" class="tab-btn pb-2.5 px-4 ${currentTab === 'memo' ? 'active' : 'text-slate-500'}">
+                            <i class="fa-solid fa-note-sticky mr-1"></i> 클라우드 메모장
+                        </button>
                     </div>
                 </div>
 
@@ -426,20 +422,31 @@
                                         <span class="text-xs font-black text-slate-800 bg-blue-50 text-blue-700 px-2.5 py-1 rounded-lg">Day ${day}</span>
                                         <span class="text-xs text-slate-400">${dayItems.length}개의 일정</span>
                                     </div>
-                                    <div class="space-y-2.5">
+                                    <div class="space-y-3">
                                         ${dayItems.length ? dayItems.map(item => `
-                                            <div class="flex items-start justify-between group p-2 rounded-xl hover:bg-slate-50 transition-colors">
-                                                <div class="flex items-start space-x-3">
-                                                    <span class="text-xs font-bold text-slate-400 mt-0.5 w-10">${item.time}</span>
-                                                    <div>
+                                            <div class="flex items-start justify-between group p-2.5 rounded-xl hover:bg-slate-50 border border-slate-100/60 transition-colors">
+                                                <div class="flex items-start space-x-3 w-full">
+                                                    <span class="text-xs font-bold text-slate-400 mt-0.5 w-10 shrink-0">${item.time}</span>
+                                                    <div class="space-y-1 w-full">
                                                         <div class="flex items-center space-x-2">
-                                                            <span class="text-sm font-semibold text-slate-900">${item.title}</span>
+                                                            <span class="text-sm font-bold text-slate-900">${item.title}</span>
                                                             <span class="text-[10px] px-2 py-0.5 rounded-md font-medium ${item.category === '맛집' ? 'bg-amber-50 text-amber-600' : item.category === '이동' ? 'bg-indigo-50 text-indigo-600' : 'bg-emerald-50 text-emerald-600'}">${item.category}</span>
                                                         </div>
-                                                        ${item.note ? `<p class="text-xs text-slate-500 mt-0.5">${item.note}</p>` : ''}
+                                                        ${item.address ? `
+                                                            <div class="flex items-center space-x-1.5 text-xs text-slate-500">
+                                                                <i class="fa-solid fa-location-dot text-rose-500 text-[10px]"></i>
+                                                                <span class="truncate">${item.address}</span>
+                                                            </div>
+                                                        ` : ''}
+                                                        ${item.note ? `
+                                                            <div class="flex items-center space-x-1.5 text-xs text-slate-500">
+                                                                <i class="fa-regular fa-comment-dots text-blue-500 text-[10px]"></i>
+                                                                <span>${item.note}</span>
+                                                            </div>
+                                                        ` : ''}
                                                     </div>
                                                 </div>
-                                                <button onclick="deleteItem(${item.id})" class="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity p-1">
+                                                <button onclick="deleteItem(${item.id})" class="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity p-1 ml-2">
                                                     <i class="fa-solid fa-trash-can text-xs"></i>
                                                 </button>
                                             </div>
@@ -449,7 +456,7 @@
                             `;
                         }).join('')}
                     </div>
-                ` : `
+                ` : currentTab === 'checklist' ? `
                     <!-- Tab Content: Checklist -->
                     <div class="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-4">
                         <div class="flex justify-between items-center">
@@ -472,6 +479,23 @@
                         <div class="pt-2">
                             <input type="text" onkeydown="addChecklistItem(event)" placeholder="+ 준비물 항목 추가 후 Enter" class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
+                    </div>
+                ` : `
+                    <!-- Tab Content: Cloud Memo -->
+                    <div class="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-4">
+                        <div class="flex justify-between items-center">
+                            <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider">실시간 공유 메모장</h4>
+                            <span class="text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md font-medium">자동 동기화 지원</span>
+                        </div>
+                        
+                        <p class="text-xs text-slate-500">여행 관련 꿀팁, 택시 기사님께 보여줄 중국어 주소, 공유할 정보 등을 자유롭게 적어두세요. 작성 후 저장 버튼을 누르면 동행인 화면에도 즉시 보입니다.</p>
+
+                        <textarea id="tripMemoInput" rows="8" placeholder="예: 택시 탈 때 '请带我去...' 라고 말하기&#10;현지 맛집 리스트 및 예산 적어두기" class="w-full p-4 text-sm rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed font-mono text-slate-800">${trip.memoText || ''}</textarea>
+
+                        <button onclick="saveTripMemo()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl shadow-md shadow-blue-500/20 transition-all text-xs flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-floppy-disk"></i>
+                            <span>메모 클라우드에 저장하기</span>
+                        </button>
                     </div>
                 `}
             `;
