@@ -337,7 +337,6 @@
             if (!trip.items) trip.items = [];
 
             if (editId) {
-                // 수정 모드
                 const item = trip.items.find(i => i.id == editId);
                 if (item) {
                     item.day = parseInt(document.getElementById('itemDay').value);
@@ -348,7 +347,6 @@
                     item.note = document.getElementById('itemNote').value || '';
                 }
             } else {
-                // 신규 추가 모드
                 const newItem = {
                     id: Date.now(),
                     day: parseInt(document.getElementById('itemDay').value),
@@ -561,7 +559,7 @@
                         
                         <p class="text-xs text-slate-500">여행 관련 꿀팁, 택시 기사님께 보여줄 중국어 주소, 공유할 정보 등을 자유롭게 적어두세요.</p>
 
-                        <textarea id="tripMemoInput" rows="8" placeholder="예: 택시 탈 때 '请带 me 去...' 라고 말하기" class="w-full p-4 text-sm rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed font-mono text-slate-800">${trip.memoText || ''}</textarea>
+                        <textarea id="tripMemoInput" rows="8" placeholder="예: 택시 탈 때 '请带 me 去...' 라고 말하기" class="w-full p-4 text-sm rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed text-slate-800 font-sans">${trip.memoText || ''}</textarea>
 
                         <button onclick="saveTripMemo()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl shadow-md shadow-blue-500/20 transition-all text-xs flex items-center justify-center space-x-2">
                             <i class="fa-solid fa-floppy-disk"></i>
