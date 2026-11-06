@@ -6,8 +6,6 @@
     <title>대장님의 실시간 여행 기록소</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
         body { font-family: 'Pretendard', sans-serif; background-color: #f8fafc; color: #0f172a; }
@@ -15,25 +13,11 @@
         .tab-btn.active { color: #2563eb; border-bottom: 2px solid #2563eb; font-weight: 700; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        #map { width: 100%; height: 380px; border-radius: 1.5rem; z-index: 1; }
-        .custom-map-marker {
-            background-color: #2563eb;
-            color: white;
-            font-weight: 800;
-            font-size: 11px;
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: 2px solid white;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-        }
     </style>
 </head>
 <body class="pb-24">
 
+    <!-- Header -->
     <header class="sticky top-0 z-50 glass-panel px-5 py-4 flex items-center justify-between shadow-sm">
         <div class="flex items-center space-x-3">
             <div class="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-bold text-xl shadow-md shadow-blue-500/30">
@@ -43,7 +27,7 @@
                 <h1 class="text-lg font-bold tracking-tight leading-none text-slate-900">대장님의 여행 기록소</h1>
                 <div class="flex items-center space-x-1.5 mt-1">
                     <span id="syncStatus" class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                    <p class="text-xs text-slate-500">Firebase 클라우드 자동 불러오기 완료</p>
+                    <p class="text-xs text-slate-500">Firebase 실시간 연동 완료</p>
                 </div>
             </div>
         </div>
@@ -55,6 +39,7 @@
 
     <main class="max-w-3xl mx-auto px-4 mt-6 space-y-6">
 
+        <!-- Banner / Stats Summary -->
         <section class="bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-950 text-white rounded-3xl p-6 shadow-xl relative overflow-hidden">
             <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-blue-500/20 rounded-full blur-3xl pointer-events-none"></div>
             <div class="flex items-center justify-between mb-4">
@@ -81,14 +66,19 @@
             </div>
         </section>
 
+        <!-- Trip Selector & Filter -->
         <section class="flex items-center space-x-2 overflow-x-auto hide-scrollbar py-1" id="tripTabs">
+            <!-- Dynamic Tabs -->
         </section>
 
+        <!-- Main Content Area -->
         <div id="mainTripContainer">
+            <!-- Dynamic Content -->
         </div>
 
     </main>
 
+    <!-- Modal: Add New Trip -->
     <div id="addTripModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 hidden transition-opacity">
         <div class="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center pb-2 border-b border-slate-100">
@@ -137,6 +127,7 @@
         </div>
     </div>
 
+    <!-- Modal: Add / Edit Schedule Item -->
     <div id="addItemModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 hidden transition-opacity">
         <div class="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center pb-2 border-b border-slate-100">
@@ -191,4 +182,606 @@
                     <button type="button" id="deleteItemBtn" onclick="handleDeleteItem()" class="hidden w-1/3 bg-rose-50 text-rose-600 font-semibold py-3 rounded-xl hover:bg-rose-100 transition-all text-xs">
                         삭제하기
                     </button>
-                    <button type="submit" id="saveItemBtn" class="w-full bg-blue-600 text-white font-semibold py-3 rounded-xl hover:bg-blue-700 shadow-md shadow-blue-500/20 transition
+                    <button type="submit" id="saveItemBtn" class="w-full bg-blue-600 text-white font-semibold py-3 rounded-xl hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all text-xs">
+                        실시간 저장하기
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Edit Checklist Item -->
+    <div id="editChecklistModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 hidden transition-opacity">
+        <div class="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center pb-2 border-b border-slate-100">
+                <h3 class="text-base font-bold text-slate-900">준비물 항목 수정/삭제</h3>
+                <button onclick="closeModal('editChecklistModal')" class="text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <form onsubmit="handleSaveChecklist(event)" class="space-y-3.5 text-sm">
+                <input type="hidden" id="editingChecklistId" value="">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">준비물 내용</label>
+                    <input type="text" id="checklistText" required class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div class="flex space-x-2 pt-2">
+                    <button type="button" onclick="handleDeleteChecklist()" class="w-1/3 bg-rose-50 text-rose-600 font-semibold py-3 rounded-xl hover:bg-rose-100 transition-all text-xs">
+                        삭제하기
+                    </button>
+                    <button type="submit" class="w-2/3 bg-blue-600 text-white font-semibold py-3 rounded-xl hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all text-xs">
+                        수정 저장하기
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Hotel Info & Copy -->
+    <div id="hotelModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-4 text-center">
+            <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto text-xl">
+                <i class="fa-solid fa-hotel"></i>
+            </div>
+            <div>
+                <h3 id="hotelModalName" class="text-base font-bold text-slate-900"></h3>
+                <p id="hotelModalAddress" class="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl mt-2 font-mono border border-slate-100 leading-relaxed"></p>
+            </div>
+            <div class="flex space-x-2">
+                <button onclick="copyHotelAddress()" class="w-full bg-blue-600 text-white font-semibold py-3 rounded-xl hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all text-xs flex items-center justify-center space-x-1.5">
+                    <i class="fa-solid fa-copy"></i>
+                    <span>주소 복사하기</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Flight Details Popup -->
+    <div id="flightModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-4">
+            <div class="flex justify-between items-center pb-2 border-b border-slate-100">
+                <h3 class="text-base font-bold text-slate-900">✈️ 왕복 항공편 정보</h3>
+                <button onclick="closeModal('flightModal')" class="text-slate-400 hover:text-slate-600">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div class="space-y-3 text-xs">
+                <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
+                    <span class="text-[10px] font-bold text-blue-600 uppercase tracking-wider">출발편 (가는 편)</span>
+                    <p id="flightOutDetail" class="text-sm font-extrabold text-slate-900 mt-1"></p>
+                </div>
+                <div class="bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
+                    <span class="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">귀국편 (오는 편 / 복편)</span>
+                    <p id="flightInDetail" class="text-sm font-extrabold text-slate-900 mt-1"></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK Compat Loaders -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyAPgadPS4n65v7t_Xsg4kOzduW-54bs0-U",
+            authDomain: "my-log-953f5.firebaseapp.com",
+            projectId: "my-log-953f5",
+            storageBucket: "my-log-953f5.firebasestorage.app",
+            messagingSenderId: "556942155615",
+            appId: "1:556942155615:web:50b258965240f4d2a7e0ea",
+            measurementId: "G-XWMM09791L"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        let trips = [];
+        let activeTripId = '';
+        let currentTab = 'timeline';
+        let selectedCategoryFilter = '전체';
+
+        const defaultSeedTrip = {
+            id: 'dalian-2026',
+            title: '대련 3박 4일 여행',
+            city: '중국 대련',
+            dates: '11.13 - 11.16',
+            hotel: 'Novotel Dalian Zhongshan Square',
+            hotelAddress: '中山区 玉光街 7号 (중산광장 도보 3분)',
+            flightOut: '아시아나 OZ301 (09:35 출발)',
+            flightIn: '아시아나 OZ302 (11:00 출발)',
+            memoText: '• 택시 탈 때 고덕지도 화면 보여주기\n• 백화점 상권 시안루(西安路) 추천 맛집 체크\n• 비상금 및 현금 별도 보관',
+            checklists: [
+                { id: 1, text: '여권 & 중국 비자 확인', done: true },
+                { id: 2, text: '트래블로그 / 현금 환전', done: true },
+                { id: 3, text: 'eSIM 등록 및 활성화', done: false },
+                { id: 4, text: '돼지코 변환 플러그 챙기기', done: false }
+            ],
+            items: [
+                { id: 101, day: 1, time: '09:35', title: '인천공항 출발 (OZ301)', category: '이동', address: '인천 중구 공항로 272', note: '시차 -1시간 반영 / 약 1시간 25분 소요' },
+                { id: 102, day: 1, time: '11:30', title: '노보텔 체크인 & 짐 보관', category: '이동', address: '中山区 玉光街 7号', note: '중산광장 도보 3분 거리' },
+                { id: 103, day: 1, time: '13:30', title: '러시아 거리 탐방', category: '관광', address: '中山区 胜利桥北', note: '유럽풍 건축물 산책 및 사진 촬영' },
+                { id: 104, day: 1, time: '17:00', title: '동항 이탈리아 수성 & 음악분수', category: '관광', address: '中山区 港浦路', note: '운하 야경 감상 / 분수쇼 시간 확인' },
+                { id: 105, day: 2, time: '09:00', title: '연화산 전망대 모노레일', category: '관광', address: '西岗区 滨海西路', note: '다롄 전경 및 서해안 해변 감상' },
+                { id: 106, day: 2, time: '14:00', title: '성해광장 (大连星海广场)', category: '관광', address: '沙河口区 星海广场', note: '동양 최대 규모 광장 / 바다 산책' },
+                { id: 107, day: 2, time: '18:00', title: '밍지카오위 (카오위 맛집)', category: '맛집', address: '沙河口区 西安路 Roosevelt Center 4F', note: '농어(海鲈鱼) 마라 맛 추천' },
+                { id: 108, day: 3, time: '10:00', title: '동관지에 근대 거리 산책', category: '관광', address: '西岗区 东关街', note: '레트로 분위기 핫플레이스' },
+                { id: 109, day: 3, time: '18:30', title: '시안루 야시장 투어', category: '맛집', address: '沙河口区 长兴街', note: '길거리 야식 및 꿔바로우 맛보기' },
+                { id: 110, day: 0, time: '미정', title: '강도 마사지 (康道按摩)', category: '마사지', address: '中山区 附近', note: '발 마사지 및 전신 힐링' },
+                { id: 111, day: 0, time: '미정', title: '중산광장 근처 디저트 카페', category: '카페', address: '中山区 中山广场 附近', note: '에스프레소 & 타르트 유명' }
+            ]
+        };
+
+        db.collection("trips").onSnapshot((snapshot) => {
+            const fetchedTrips = [];
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                if (data && data.title) fetchedTrips.push(data);
+            });
+            
+            if (fetchedTrips.length === 0) {
+                db.collection("trips").doc(defaultSeedTrip.id).set(defaultSeedTrip);
+                trips = [defaultSeedTrip];
+            } else {
+                trips = fetchedTrips;
+            }
+
+            if (!activeTripId && trips.length > 0) activeTripId = trips[0].id;
+            render();
+        }, (error) => {
+            console.error("Firebase Sync Error:", error);
+            if(trips.length === 0) trips = [defaultSeedTrip];
+            render();
+        });
+
+        async function syncTripToCloud(trip) {
+            try {
+                await db.collection("trips").doc(trip.id).set(trip);
+            } catch (err) {
+                console.error("Cloud Save Failed:", err);
+            }
+        }
+
+        window.openModal = (id) => document.getElementById(id).classList.remove('hidden');
+        window.closeModal = (id) => document.getElementById(id).classList.add('hidden');
+
+        window.openHotelModal = () => {
+            const trip = trips.find(t => t.id === activeTripId);
+            if (!trip) return;
+            document.getElementById('hotelModalName').innerText = trip.hotel || '숙소 이름 미정';
+            document.getElementById('hotelModalAddress').innerText = trip.hotelAddress || trip.hotel || '등록된 상세 주소가 없습니다.';
+            openModal('hotelModal');
+        };
+
+        window.copyHotelAddress = () => {
+            const text = document.getElementById('hotelModalAddress').innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                alert('호텔 주소가 복사되었습니다!');
+                closeModal('hotelModal');
+            });
+        };
+
+        window.openFlightModal = () => {
+            const trip = trips.find(t => t.id === activeTripId);
+            if (!trip) return;
+            document.getElementById('flightOutDetail').innerText = trip.flightOut || '출발편 미정';
+            document.getElementById('flightInDetail').innerText = trip.flightIn || '복편/귀국편 미정';
+            openModal('flightModal');
+        };
+
+        window.openAddModal = () => {
+            document.getElementById('itemModalTitle').innerText = "일정 / 장소 추가";
+            document.getElementById('editingItemId').value = "";
+            document.getElementById('newItemForm').reset();
+            document.getElementById('deleteItemBtn').classList.add('hidden');
+            document.getElementById('saveItemBtn').className = "w-full bg-blue-600 text-white font-semibold py-3 rounded-xl hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all text-xs";
+            openModal('addItemModal');
+        };
+
+        window.openEditModal = (itemId) => {
+            const trip = trips.find(t => t.id === activeTripId);
+            if (!trip) return;
+            const item = (trip.items || []).find(i => i.id === itemId);
+            if (!item) return;
+
+            document.getElementById('itemModalTitle').innerText = "일정 / 장소 수정";
+            document.getElementById('editingItemId').value = item.id;
+            document.getElementById('itemDay').value = item.day !== undefined ? item.day : 1;
+            document.getElementById('itemTime').value = item.time || "";
+            document.getElementById('itemCategory').value = item.category || "관광";
+            document.getElementById('itemTitle').value = item.title || "";
+            document.getElementById('itemAddress').value = item.address || "";
+            document.getElementById('itemNote').value = item.note || "";
+
+            document.getElementById('deleteItemBtn').classList.remove('hidden');
+            document.getElementById('saveItemBtn').className = "w-2/3 bg-blue-600 text-white font-semibold py-3 rounded-xl hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all text-xs";
+            openModal('addItemModal');
+        };
+
+        window.openEditChecklistModal = (checkId) => {
+            const trip = trips.find(t => t.id === activeTripId);
+            if (!trip) return;
+            const check = (trip.checklists || []).find(c => c.id === checkId);
+            if (!check) return;
+
+            document.getElementById('editingChecklistId').value = check.id;
+            document.getElementById('checklistText').value = check.text;
+            openModal('editChecklistModal');
+        };
+
+        window.setActiveTrip = (id) => {
+            activeTripId = id;
+            render();
+        };
+
+        window.setSubTab = (tab) => {
+            currentTab = tab;
+            render();
+        };
+
+        window.setCategoryFilter = (cat) => {
+            selectedCategoryFilter = cat;
+            render();
+        };
+
+        window.handleCreateTrip = async (e) => {
+            e.preventDefault();
+            const newTrip = {
+                id: 'trip-' + Date.now(),
+                title: document.getElementById('tripTitle').value,
+                city: document.getElementById('tripCity').value,
+                dates: document.getElementById('tripDates').value,
+                hotel: document.getElementById('tripHotel').value || '숙소 미정',
+                hotelAddress: document.getElementById('tripHotelAddress').value || '',
+                flightOut: document.getElementById('flightOut').value || '미정',
+                flightIn: document.getElementById('flightIn').value || '미정',
+                memoText: '',
+                checklists: [
+                    { id: Date.now()+1, text: '여권 챙기기', done: false },
+                    { id: Date.now()+2, text: '환전 / 결제 카드 챙기기', done: false }
+                ],
+                items: []
+            };
+
+            trips.unshift(newTrip);
+            activeTripId = newTrip.id;
+            closeModal('addTripModal');
+            document.getElementById('newTripForm').reset();
+            render();
+            await syncTripToCloud(newTrip);
+        };
+
+        window.handleSaveItem = async (e) => {
+            e.preventDefault();
+            const trip = trips.find(t => t.id === activeTripId);
+            if (!trip) return;
+
+            const editId = document.getElementById('editingItemId').value;
+            if (!trip.items) trip.items = [];
+
+            if (editId) {
+                const item = trip.items.find(i => i.id == editId);
+                if (item) {
+                    item.day = parseInt(document.getElementById('itemDay').value);
+                    item.time = document.getElementById('itemTime').value || '시간 미정';
+                    item.category = document.getElementById('itemCategory').value;
+                    item.title = document.getElementById('itemTitle').value;
+                    item.address = document.getElementById('itemAddress').value || '';
+                    item.note = document.getElementById('itemNote').value || '';
+                }
+            } else {
+                const newItem = {
+                    id: Date.now(),
+                    day: parseInt(document.getElementById('itemDay').value),
+                    time: document.getElementById('itemTime').value || '시간 미정',
+                    title: document.getElementById('itemTitle').value,
+                    category: document.getElementById('itemCategory').value,
+                    address: document.getElementById('itemAddress').value || '',
+                    note: document.getElementById('itemNote').value || ''
+                };
+                trip.items.push(newItem);
+            }
+
+            trip.items.sort((a,b) => a.day - b.day || a.time.localeCompare(b.time));
+            
+            closeModal('addItemModal');
+            document.getElementById('newItemForm').reset();
+            render();
+            await syncTripToCloud(trip);
+        };
+
+        window.handleDeleteItem = async () => {
+            const editId = document.getElementById('editingItemId').value;
+            if (!editId) return;
+            const trip = trips.find(t => t.id === activeTripId);
+            if (!trip) return;
+
+            trip.items = (trip.items || []).filter(i => i.id != editId);
+            closeModal('addItemModal');
+            render();
+            await syncTripToCloud(trip);
+        };
+
+        window.handleSaveChecklist = async (e) => {
+            e.preventDefault();
+            const checkId = document.getElementById('editingChecklistId').value;
+            const text = document.getElementById('checklistText').value.trim();
+            const trip = trips.find(t => t.id === activeTripId);
+            if (!trip || !checkId || !text) return;
+
+            const check = (trip.checklists || []).find(c => c.id == checkId);
+            if (check) check.text = text;
+
+            closeModal('editChecklistModal');
+            render();
+            await syncTripToCloud(trip);
+        };
+
+        window.handleDeleteChecklist = async () => {
+            const checkId = document.getElementById('editingChecklistId').value;
+            const trip = trips.find(t => t.id === activeTripId);
+            if (!trip || !checkId) return;
+
+            trip.checklists = (trip.checklists || []).filter(c => c.id != checkId);
+
+            closeModal('editChecklistModal');
+            render();
+            await syncTripToCloud(trip);
+        };
+
+        window.saveTripMemo = async () => {
+            const trip = trips.find(t => t.id === activeTripId);
+            if (!trip) return;
+            const text = document.getElementById('tripMemoInput').value;
+            trip.memoText = text;
+            render();
+            await syncTripToCloud(trip);
+            alert('클라우드에 메모가 저장되었습니다!');
+        };
+
+        window.toggleChecklist = async (checkId, event) => {
+            event.stopPropagation();
+            const trip = trips.find(t => t.id === activeTripId);
+            if (!trip) return;
+            const check = (trip.checklists || []).find(c => c.id === checkId);
+            if (check) check.done = !check.done;
+            render();
+            await syncTripToCloud(trip);
+        };
+
+        window.addChecklistItem = async (e) => {
+            if (e.key === 'Enter' && e.target.value.trim()) {
+                const trip = trips.find(t => t.id === activeTripId);
+                if (!trip) return;
+                if(!trip.checklists) trip.checklists = [];
+                trip.checklists.push({ id: Date.now(), text: e.target.value.trim(), done: false });
+                e.target.value = '';
+                render();
+                await syncTripToCloud(trip);
+            }
+        };
+
+        function renderStats() {
+            document.getElementById('tripCounter').innerText = `총 ${trips.length}개의 여정`;
+            const cities = new Set(trips.map(t => t.city)).size;
+            const totalPlaces = trips.reduce((acc, t) => acc + (t.items ? t.items.length : 0), 0);
+            document.getElementById('statCities').innerText = cities;
+            document.getElementById('statPlaces').innerText = totalPlaces;
+        }
+
+        function renderTabs() {
+            const container = document.getElementById('tripTabs');
+            container.innerHTML = trips.map(t => `
+                <button onclick="setActiveTrip('${t.id}')" class="px-4 py-2 rounded-2xl text-xs font-semibold whitespace-nowrap transition-all ${t.id === activeTripId ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}">
+                    📍 ${t.title}
+                </button>
+            `).join('');
+        }
+
+        function renderMainContent() {
+            const container = document.getElementById('mainTripContainer');
+            const trip = trips.find(t => t.id === activeTripId);
+
+            if (!trip) {
+                container.innerHTML = `<div class="text-center py-12 text-slate-400 text-sm">등록된 여행 프로젝트가 없습니다.</div>`;
+                return;
+            }
+
+            container.innerHTML = `
+                <!-- Trip Summary Info Card -->
+                <div class="bg-white rounded-3xl p-5 shadow-sm border border-slate-200/80 mb-6 space-y-3">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span class="text-xs font-bold text-blue-600 uppercase tracking-wider">${trip.city}</span>
+                            <h3 class="text-lg font-extrabold text-slate-900 mt-0.5">${trip.title}</h3>
+                        </div>
+                        <span class="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg font-medium">${trip.dates}</span>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-100 text-slate-600">
+                        <div onclick="openHotelModal()" class="flex items-center space-x-2 bg-slate-50 hover:bg-blue-50/60 p-2.5 rounded-xl cursor-pointer transition-colors group">
+                            <i class="fa-solid fa-hotel text-blue-500"></i>
+                            <span class="truncate font-medium group-hover:text-blue-600">${trip.hotel}</span>
+                        </div>
+                        <div onclick="openFlightModal()" class="flex items-center space-x-2 bg-slate-50 hover:bg-indigo-50/60 p-2.5 rounded-xl cursor-pointer transition-colors group">
+                            <i class="fa-solid fa-plane text-indigo-500"></i>
+                            <span class="truncate font-medium group-hover:text-indigo-600">${trip.flightOut}</span>
+                        </div>
+                    </div>
+
+                    <!-- Sub Tab Switches -->
+                    <div class="flex border-b border-slate-200 text-xs pt-2 overflow-x-auto hide-scrollbar">
+                        <button onclick="setSubTab('timeline')" class="tab-btn pb-2.5 px-3.5 whitespace-nowrap ${currentTab === 'timeline' ? 'active' : 'text-slate-500'}">
+                            <i class="fa-solid fa-timeline mr-1"></i> 타임라인
+                        </button>
+                        <button onclick="setSubTab('category')" class="tab-btn pb-2.5 px-3.5 whitespace-nowrap ${currentTab === 'category' ? 'active' : 'text-slate-500'}">
+                            <i class="fa-solid fa-layer-group mr-1"></i> 카테고리 스크랩북
+                        </button>
+                        <button onclick="setSubTab('checklist')" class="tab-btn pb-2.5 px-3.5 whitespace-nowrap ${currentTab === 'checklist' ? 'active' : 'text-slate-500'}">
+                            <i class="fa-solid fa-list-check mr-1"></i> 체크리스트 (${(trip.checklists||[]).filter(c=>c.done).length}/${(trip.checklists||[]).length})
+                        </button>
+                        <button onclick="setSubTab('memo')" class="tab-btn pb-2.5 px-3.5 whitespace-nowrap ${currentTab === 'memo' ? 'active' : 'text-slate-500'}">
+                            <i class="fa-solid fa-note-sticky mr-1"></i> 메모장
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Tab Content: Timeline -->
+                ${currentTab === 'timeline' ? `
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center">
+                            <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Day-by-Day Itinerary</h4>
+                            <button onclick="openAddModal()" class="text-xs font-semibold text-blue-600 hover:underline flex items-center space-x-1">
+                                <i class="fa-solid fa-plus"></i><span>일정 추가</span>
+                            </button>
+                        </div>
+                        
+                        ${[1,2,3,4].map(day => {
+                            const dayItems = (trip.items || []).filter(i => i.day === day);
+                            if (dayItems.length === 0 && day > 2) return '';
+                            return `
+                                <div class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm space-y-3">
+                                    <div class="flex items-center justify-between pb-2 border-b border-slate-100">
+                                        <span class="text-xs font-black text-slate-800 bg-blue-50 text-blue-700 px-2.5 py-1 rounded-lg">Day ${day}</span>
+                                        <span class="text-xs text-slate-400">${dayItems.length}개의 일정</span>
+                                    </div>
+                                    <div class="space-y-3">
+                                        ${dayItems.length ? dayItems.map(item => `
+                                            <div onclick="openEditModal(${item.id})" class="flex items-start justify-between p-3 rounded-xl bg-slate-50/60 hover:bg-blue-50/50 border border-slate-100 cursor-pointer transition-all hover:border-blue-200 group">
+                                                <div class="flex items-start space-x-3 w-full">
+                                                    <span class="text-xs font-bold text-slate-400 mt-0.5 w-10 shrink-0">${item.time}</span>
+                                                    <div class="space-y-1 w-full">
+                                                        <div class="flex items-center space-x-2">
+                                                            <span class="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">${item.title}</span>
+                                                            <span class="text-[10px] px-2 py-0.5 rounded-md font-medium ${item.category === '맛집' ? 'bg-amber-100 text-amber-700' : item.category === '카페' ? 'bg-rose-100 text-rose-700' : item.category === '마사지' ? 'bg-teal-100 text-teal-700' : item.category === '이동' ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'}">${item.category}</span>
+                                                        </div>
+                                                        ${item.address ? `
+                                                            <div class="flex items-center space-x-1.5 text-xs text-slate-600 bg-white px-2 py-1 rounded-lg border border-slate-200/60 w-fit">
+                                                                <i class="fa-solid fa-location-dot text-rose-500 text-[11px]"></i>
+                                                                <span>${item.address}</span>
+                                                            </div>
+                                                        ` : ''}
+                                                        ${item.note ? `
+                                                            <div class="flex items-center space-x-1.5 text-xs text-slate-500 pt-0.5">
+                                                                <i class="fa-regular fa-comment-dots text-blue-500 text-[11px]"></i>
+                                                                <span>${item.note}</span>
+                                                            </div>
+                                                        ` : ''}
+                                                    </div>
+                                                </div>
+                                                <div class="text-slate-300 group-hover:text-blue-500 transition-colors pl-2 pt-1">
+                                                    <i class="fa-solid fa-pen-to-square text-xs"></i>
+                                                </div>
+                                            </div>
+                                        `).join('') : '<p class="text-xs text-slate-400 text-center py-2">등록된 일정이 없습니다.</p>'}
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                ` : currentTab === 'category' ? `
+                    <!-- Tab Content: Category Scrapbook -->
+                    <div class="space-y-4">
+                        <div class="flex justify-between items-center">
+                            <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider">카테고리별 장소 스크랩</h4>
+                            <button onclick="openAddModal()" class="text-xs font-semibold text-blue-600 hover:underline flex items-center space-x-1">
+                                <i class="fa-solid fa-plus"></i><span>장소 등록</span>
+                            </button>
+                        </div>
+
+                        <!-- Category Filter Chips -->
+                        <div class="flex items-center space-x-1.5 overflow-x-auto hide-scrollbar py-1">
+                            ${['전체', '맛집', '카페', '마사지', '관광', '쇼핑'].map(cat => `
+                                <button onclick="setCategoryFilter('${cat}')" class="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${selectedCategoryFilter === cat ? 'bg-slate-900 text-white shadow-sm' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}">
+                                    ${cat === '맛집' ? '🍲 맛집' : cat === '카페' ? '☕ 카페' : cat === '마사지' ? '💆‍♂️ 마사지' : cat === '관광' ? '🎡 관광' : cat === '쇼핑' ? '🛍️ 쇼핑' : '✨ 전체'}
+                                </button>
+                            `).join('')}
+                        </div>
+
+                        <!-- Category Items Cards -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            ${(() => {
+                                const filteredItems = (trip.items || []).filter(i => selectedCategoryFilter === '전체' || i.category === selectedCategoryFilter);
+                                if (filteredItems.length === 0) {
+                                    return `<div class="col-span-full bg-white rounded-2xl p-8 text-center text-slate-400 text-xs border border-slate-200/80">등록된 장소가 없습니다. 우측 상단 '장소 등록'으로 추가해 보세요!</div>`;
+                                }
+                                return filteredItems.map(item => `
+                                    <div onclick="openEditModal(${item.id})" class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm hover:border-blue-300 transition-all cursor-pointer space-y-2 relative group">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-xs font-bold ${item.category === '맛집' ? 'text-amber-600 bg-amber-50' : item.category === '카페' ? 'text-rose-600 bg-rose-50' : item.category === '마사지' ? 'text-teal-600 bg-teal-50' : item.category === '쇼핑' ? 'text-purple-600 bg-purple-50' : 'text-emerald-600 bg-emerald-50'} px-2.5 py-1 rounded-lg">
+                                                ${item.category === '맛집' ? '🍲 맛집' : item.category === '카페' ? '☕ 카페' : item.category === '마사지' ? '💆‍♂️ 마사지' : item.category === '쇼핑' ? '🛍️ 쇼핑' : '🎡 관광'}
+                                            </span>
+                                            <span class="text-[10px] text-slate-400 font-medium">${item.day ? item.day + '일차' : '스크랩'}</span>
+                                        </div>
+                                        <h5 class="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">${item.title}</h5>
+                                        ${item.address ? `
+                                            <p class="text-xs text-slate-500 flex items-center space-x-1 truncate">
+                                                <i class="fa-solid fa-location-dot text-rose-500 text-[10px]"></i>
+                                                <span>${item.address}</span>
+                                            </p>
+                                        ` : ''}
+                                        ${item.note ? `
+                                            <p class="text-xs text-slate-600 bg-slate-50 p-2 rounded-xl leading-relaxed">
+                                                💡 ${item.note}
+                                            </p>
+                                        ` : ''}
+                                    </div>
+                                `).join('');
+                            })()}
+                        </div>
+                    </div>
+                ` : currentTab === 'checklist' ? `
+                    <!-- Tab Content: Checklist -->
+                    <div class="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-4">
+                        <div class="flex justify-between items-center">
+                            <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider">준비물 & 체크리스트</h4>
+                            <span class="text-[10px] text-slate-400">항목 터치 시 수정/삭제 가능</span>
+                        </div>
+                        
+                        <div class="space-y-2">
+                            ${(trip.checklists || []).map(check => `
+                                <div onclick="openEditChecklistModal(${check.id})" class="flex items-center justify-between p-3.5 rounded-2xl border ${check.done ? 'bg-slate-50 border-slate-200 text-slate-400 line-through' : 'bg-white border-slate-200/80 text-slate-800'} cursor-pointer hover:border-blue-300 transition-all group">
+                                    <div class="flex items-center space-x-3 text-sm font-medium w-full pr-2">
+                                        <i class="fa-solid fa-pen text-xs text-slate-300 group-hover:text-blue-500 transition-colors shrink-0"></i>
+                                        <span class="truncate">${check.text}</span>
+                                    </div>
+                                    <div onclick="toggleChecklist(${check.id}, event)" class="w-6 h-6 rounded-lg border ${check.done ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 hover:border-blue-400'} flex items-center justify-center text-xs shrink-0 transition-colors">
+                                        ${check.done ? '<i class="fa-solid fa-check"></i>' : ''}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+
+                        <div class="pt-2">
+                            <input type="text" onkeydown="addChecklistItem(event)" placeholder="+ 준비물 항목 추가 후 Enter" class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+                ` : `
+                    <!-- Tab Content: Cloud Memo -->
+                    <div class="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-4">
+                        <div class="flex justify-between items-center">
+                            <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider">실시간 공유 메모장</h4>
+                            <span class="text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md font-medium">자동 동기화 지원</span>
+                        </div>
+                        
+                        <p class="text-xs text-slate-500">여행 관련 꿀팁, 택시 기사님께 보여줄 중국어 주소, 공유할 정보 등을 자유롭게 적어두세요.</p>
+
+                        <textarea id="tripMemoInput" rows="8" placeholder="예: 택시 탈 때 '请带 me 去...' 라고 말하기" class="w-full p-4 text-sm rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed text-slate-800 font-sans">${trip.memoText || ''}</textarea>
+
+                        <button onclick="saveTripMemo()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl shadow-md shadow-blue-500/20 transition-all text-xs flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-floppy-disk"></i>
+                            <span>메모 클라우드에 저장하기</span>
+                        </button>
+                    </div>
+                `}
+            `;
+        }
+
+        function render() {
+            renderStats();
+            renderTabs();
+            renderMainContent();
+        }
+    </script>
+</body>
+</html>
