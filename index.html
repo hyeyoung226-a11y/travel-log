@@ -123,16 +123,17 @@
         </div>
     </div>
 
-    <!-- Modal: Add Schedule Item -->
+    <!-- Modal: Add / Edit Schedule Item -->
     <div id="addItemModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 hidden transition-opacity">
         <div class="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div class="flex justify-between items-center pb-2 border-b border-slate-100">
-                <h3 class="text-base font-bold text-slate-900">일정 / 장소 추가</h3>
+                <h3 id="itemModalTitle" class="text-base font-bold text-slate-900">일정 / 장소 추가</h3>
                 <button onclick="closeModal('addItemModal')" class="text-slate-400 hover:text-slate-600">
                     <i class="fa-solid fa-xmark text-lg"></i>
                 </button>
             </div>
-            <form id="newItemForm" onsubmit="handleCreateItem(event)" class="space-y-3.5 text-sm">
+            <form id="newItemForm" onsubmit="handleSaveItem(event)" class="space-y-3.5 text-sm">
+                <input type="hidden" id="editingItemId" value="">
                 <div class="grid grid-cols-3 gap-2">
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 mb-1">일차</label>
@@ -169,9 +170,15 @@
                     <label class="block text-xs font-semibold text-slate-600 mb-1">💡 메모 한줄</label>
                     <input type="text" id="itemNote" placeholder="예: 음악 분수쇼 19:30 시작 / 예산 약 100위안" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
-                <button type="submit" class="w-full bg-blue-600 text-white font-semibold py-3 rounded-xl hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all mt-2">
-                    실시간 추가하기
-                </button>
+                
+                <div class="flex space-x-2 pt-2">
+                    <button type="button" id="deleteItemBtn" onclick="handleDeleteItem()" class="hidden w-1/3 bg-rose-50 text-rose-600 font-semibold py-3 rounded-xl hover:bg-rose-100 transition-all text-xs">
+                        삭제하기
+                    </button>
+                    <button type="submit" id="saveItemBtn" class="w-full bg-blue-600 text-white font-semibold py-3 rounded-xl hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all text-xs">
+                        실시간 저장하기
+                    </button>
+                </div>
             </form>
         </div>
     </div>
@@ -241,15 +248,49 @@
             render();
         }, (error) => {
             console.error("Firebase Sync Error:", error);
+            if(trips.length === 0) trips = [defaultSeedTrip];
             render();
         });
 
         async function syncTripToCloud(trip) {
-            await db.collection("trips").doc(trip.id).set(trip);
+            try {
+                await db.collection("trips").doc(trip.id).set(trip);
+            } catch (err) {
+                console.error("Cloud Save Failed:", err);
+            }
         }
 
         window.openModal = (id) => document.getElementById(id).classList.remove('hidden');
         window.closeModal = (id) => document.getElementById(id).classList.add('hidden');
+
+        window.openAddModal = () => {
+            document.getElementById('itemModalTitle').innerText = "일정 / 장소 추가";
+            document.getElementById('editingItemId').value = "";
+            document.getElementById('newItemForm').reset();
+            document.getElementById('deleteItemBtn').classList.add('hidden');
+            document.getElementById('saveItemBtn').className = "w-full bg-blue-600 text-white font-semibold py-3 rounded-xl hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all text-xs";
+            openModal('addItemModal');
+        };
+
+        window.openEditModal = (itemId) => {
+            const trip = trips.find(t => t.id === activeTripId);
+            if (!trip) return;
+            const item = (trip.items || []).find(i => i.id === itemId);
+            if (!item) return;
+
+            document.getElementById('itemModalTitle').innerText = "일정 / 장소 수정";
+            document.getElementById('editingItemId').value = item.id;
+            document.getElementById('itemDay').value = item.day || 1;
+            document.getElementById('itemTime').value = item.time || "";
+            document.getElementById('itemCategory').value = item.category || "관광";
+            document.getElementById('itemTitle').value = item.title || "";
+            document.getElementById('itemAddress').value = item.address || "";
+            document.getElementById('itemNote').value = item.note || "";
+
+            document.getElementById('deleteItemBtn').classList.remove('hidden');
+            document.getElementById('saveItemBtn').className = "w-2/3 bg-blue-600 text-white font-semibold py-3 rounded-xl hover:bg-blue-700 shadow-md shadow-blue-500/20 transition-all text-xs";
+            openModal('addItemModal');
+        };
 
         window.setActiveTrip = (id) => {
             activeTripId = id;
@@ -283,29 +324,60 @@
             activeTripId = newTrip.id;
             closeModal('addTripModal');
             document.getElementById('newTripForm').reset();
+            render();
             await syncTripToCloud(newTrip);
         };
 
-        window.handleCreateItem = async (e) => {
+        window.handleSaveItem = async (e) => {
             e.preventDefault();
             const trip = trips.find(t => t.id === activeTripId);
             if (!trip) return;
 
-            const newItem = {
-                id: Date.now(),
-                day: parseInt(document.getElementById('itemDay').value),
-                time: document.getElementById('itemTime').value || '시간 미정',
-                title: document.getElementById('itemTitle').value,
-                category: document.getElementById('itemCategory').value,
-                address: document.getElementById('itemAddress').value || '',
-                note: document.getElementById('itemNote').value || ''
-            };
+            const editId = document.getElementById('editingItemId').value;
+            if (!trip.items) trip.items = [];
 
-            if(!trip.items) trip.items = [];
-            trip.items.push(newItem);
+            if (editId) {
+                // 수정 모드
+                const item = trip.items.find(i => i.id == editId);
+                if (item) {
+                    item.day = parseInt(document.getElementById('itemDay').value);
+                    item.time = document.getElementById('itemTime').value || '시간 미정';
+                    item.category = document.getElementById('itemCategory').value;
+                    item.title = document.getElementById('itemTitle').value;
+                    item.address = document.getElementById('itemAddress').value || '';
+                    item.note = document.getElementById('itemNote').value || '';
+                }
+            } else {
+                // 신규 추가 모드
+                const newItem = {
+                    id: Date.now(),
+                    day: parseInt(document.getElementById('itemDay').value),
+                    time: document.getElementById('itemTime').value || '시간 미정',
+                    title: document.getElementById('itemTitle').value,
+                    category: document.getElementById('itemCategory').value,
+                    address: document.getElementById('itemAddress').value || '',
+                    note: document.getElementById('itemNote').value || ''
+                };
+                trip.items.push(newItem);
+            }
+
             trip.items.sort((a,b) => a.day - b.day || a.time.localeCompare(b.time));
+            
             closeModal('addItemModal');
             document.getElementById('newItemForm').reset();
+            render();
+            await syncTripToCloud(trip);
+        };
+
+        window.handleDeleteItem = async () => {
+            const editId = document.getElementById('editingItemId').value;
+            if (!editId) return;
+            const trip = trips.find(t => t.id === activeTripId);
+            if (!trip) return;
+
+            trip.items = (trip.items || []).filter(i => i.id != editId);
+            closeModal('addItemModal');
+            render();
             await syncTripToCloud(trip);
         };
 
@@ -314,6 +386,7 @@
             if (!trip) return;
             const text = document.getElementById('tripMemoInput').value;
             trip.memoText = text;
+            render();
             await syncTripToCloud(trip);
             alert('클라우드에 메모가 저장되었습니다!');
         };
@@ -323,6 +396,7 @@
             if (!trip) return;
             const check = (trip.checklists || []).find(c => c.id === checkId);
             if (check) check.done = !check.done;
+            render();
             await syncTripToCloud(trip);
         };
 
@@ -333,15 +407,9 @@
                 if(!trip.checklists) trip.checklists = [];
                 trip.checklists.push({ id: Date.now(), text: e.target.value.trim(), done: false });
                 e.target.value = '';
+                render();
                 await syncTripToCloud(trip);
             }
-        };
-
-        window.deleteItem = async (itemId) => {
-            const trip = trips.find(t => t.id === activeTripId);
-            if (!trip) return;
-            trip.items = (trip.items || []).filter(i => i.id !== itemId);
-            await syncTripToCloud(trip);
         };
 
         function renderStats() {
@@ -411,7 +479,7 @@
                     <div class="space-y-4">
                         <div class="flex justify-between items-center">
                             <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Day-by-Day Itinerary</h4>
-                            <button onclick="openModal('addItemModal')" class="text-xs font-semibold text-blue-600 hover:underline flex items-center space-x-1">
+                            <button onclick="openAddModal()" class="text-xs font-semibold text-blue-600 hover:underline flex items-center space-x-1">
                                 <i class="fa-solid fa-plus"></i><span>일정 추가</span>
                             </button>
                         </div>
@@ -427,12 +495,12 @@
                                     </div>
                                     <div class="space-y-3">
                                         ${dayItems.length ? dayItems.map(item => `
-                                            <div class="flex items-start justify-between group p-3 rounded-xl bg-slate-50/50 hover:bg-slate-100/80 border border-slate-100 transition-colors">
+                                            <div onclick="openEditModal(${item.id})" class="flex items-start justify-between p-3 rounded-xl bg-slate-50/60 hover:bg-blue-50/50 border border-slate-100 cursor-pointer transition-all hover:border-blue-200 group">
                                                 <div class="flex items-start space-x-3 w-full">
                                                     <span class="text-xs font-bold text-slate-400 mt-0.5 w-10 shrink-0">${item.time}</span>
                                                     <div class="space-y-1 w-full">
                                                         <div class="flex items-center space-x-2">
-                                                            <span class="text-sm font-bold text-slate-900">${item.title}</span>
+                                                            <span class="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">${item.title}</span>
                                                             <span class="text-[10px] px-2 py-0.5 rounded-md font-medium ${item.category === '맛집' ? 'bg-amber-100 text-amber-700' : item.category === '이동' ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'}">${item.category}</span>
                                                         </div>
                                                         ${item.address ? `
@@ -449,9 +517,9 @@
                                                         ` : ''}
                                                     </div>
                                                 </div>
-                                                <button onclick="deleteItem(${item.id})" class="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity p-1 ml-2">
-                                                    <i class="fa-solid fa-trash-can text-xs"></i>
-                                                </button>
+                                                <div class="text-slate-300 group-hover:text-blue-500 transition-colors pl-2 pt-1">
+                                                    <i class="fa-solid fa-pen-to-square text-xs"></i>
+                                                </div>
                                             </div>
                                         `).join('') : '<p class="text-xs text-slate-400 text-center py-2">등록된 일정이 없습니다.</p>'}
                                     </div>
