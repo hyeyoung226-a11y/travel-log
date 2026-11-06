@@ -6,6 +6,9 @@
     <title>대장님의 실시간 여행 기록소</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Leaflet OpenStreetMap CSS & JS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <style>
         @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
         body { font-family: 'Pretendard', sans-serif; background-color: #f8fafc; color: #0f172a; }
@@ -13,6 +16,21 @@
         .tab-btn.active { color: #2563eb; border-bottom: 2px solid #2563eb; font-weight: 700; }
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        #map { width: 100%; height: 380px; border-radius: 1.5rem; z-index: 1; }
+        .custom-map-marker {
+            background-color: #2563eb;
+            color: white;
+            font-weight: 800;
+            font-size: 11px;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid white;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+        }
     </style>
 </head>
 <body class="pb-24">
@@ -280,6 +298,47 @@
         let activeTripId = '';
         let currentTab = 'timeline';
         let selectedCategoryFilter = '전체';
+        let mapInstance = null;
+        let mapMarkers = [];
+        let mapPolyline = null;
+        let selectedMapDay = 1;
+
+        // 대련 주요 장소 미리 입력 좌표 데이터베이스
+        const locationCoords = {
+            '인천공항': [37.4602, 126.4407],
+            '대련공항': [38.9656, 121.5386],
+            '노보텔': [38.9221, 121.6425],
+            '중산광장': [38.9215, 121.6433],
+            '러시아': [38.9288, 121.6391],
+            '동항': [38.9262, 121.6775],
+            '이탈리아': [38.9262, 121.6775],
+            '연화산': [38.8778, 121.5836],
+            '성해광장': [38.8821, 121.5828],
+            '밍지카오위': [38.9168, 121.5852],
+            '시안루': [38.9168, 121.5852],
+            '동관지에': [38.9189, 121.6152],
+            '강도': [38.9200, 121.6350]
+        };
+
+        function getCoordsForItem(item) {
+            const str = (item.title + " " + item.address).toLowerCase();
+            for (let key in locationCoords) {
+                if (str.includes(key)) return locationCoords[key];
+            }
+            // 기본값 (대련 중심 좌표에서 미세 오프셋)
+            return [38.9140 + (Math.random() * 0.02 - 0.01), 121.6150 + (Math.random() * 0.02 - 0.01)];
+        }
+
+        function calculateDistanceKm(lat1, lon1, lat2, lon2) {
+            const R = 6371; // 지구 반지름 (km)
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            return (R * c).toFixed(1);
+        }
 
         const defaultSeedTrip = {
             id: 'dalian-2026',
@@ -419,6 +478,11 @@
         window.setCategoryFilter = (cat) => {
             selectedCategoryFilter = cat;
             render();
+        };
+
+        window.setMapDayFilter = (day) => {
+            selectedMapDay = day;
+            renderMapContent();
         };
 
         window.handleCreateTrip = async (e) => {
@@ -575,210 +639,61 @@
             `).join('');
         }
 
-        function renderMainContent() {
-            const container = document.getElementById('mainTripContainer');
+        function initLeafletMap(items) {
+            setTimeout(() => {
+                const mapDiv = document.getElementById('map');
+                if (!mapDiv) return;
+
+                if (mapInstance) {
+                    mapInstance.remove();
+                    mapInstance = null;
+                }
+
+                // 대련 중심 좌표
+                const defaultCenter = [38.9140, 121.6150];
+                mapInstance = L.map('map').setView(defaultCenter, 12);
+
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '&copy; OpenStreetMap'
+                }).addTo(mapInstance);
+
+                const latLngs = [];
+                mapMarkers = [];
+
+                items.forEach((item, index) => {
+                    const coords = getCoordsForItem(item);
+                    latLngs.push(coords);
+
+                    const customIcon = L.divIcon({
+                        className: 'custom-div-icon',
+                        html: `<div class="custom-map-marker">${index + 1}</div>`,
+                        iconSize: [24, 24],
+                        iconAnchor: [12, 12]
+                    });
+
+                    const marker = L.marker(coords, { icon: customIcon }).addTo(mapInstance);
+                    marker.bindPopup(`
+                        <div style="font-size: 12px; font-family: Pretendard;">
+                            <span style="font-weight: 800; color: #2563eb;">${item.category}</span>
+                            <strong style="display: block; font-size: 13px; margin-top: 2px;">${item.title}</strong>
+                            <p style="margin: 4px 0 0 0; color: #64748b;">${item.address || ''}</p>
+                            ${item.note ? `<p style="margin: 2px 0 0 0; color: #059669;">💡 ${item.note}</p>` : ''}
+                        </div>
+                    `);
+                    mapMarkers.push(marker);
+                });
+
+                if (latLngs.length > 1) {
+                    mapPolyline = L.polyline(latLngs, { color: '#2563eb', weight: 4, dashArray: '6, 6' }).addTo(mapInstance);
+                    mapInstance.fitBounds(mapPolyline.getBounds(), { padding: [40, 40] });
+                } else if (latLngs.length === 1) {
+                    mapInstance.setView(latLngs[0], 13);
+                }
+            }, 100);
+        }
+
+        function renderMapContent() {
             const trip = trips.find(t => t.id === activeTripId);
+            if (!trip) return;
 
-            if (!trip) {
-                container.innerHTML = `<div class="text-center py-12 text-slate-400 text-sm">등록된 여행 프로젝트가 없습니다.</div>`;
-                return;
-            }
-
-            container.innerHTML = `
-                <!-- Trip Summary Info Card -->
-                <div class="bg-white rounded-3xl p-5 shadow-sm border border-slate-200/80 mb-6 space-y-3">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <span class="text-xs font-bold text-blue-600 uppercase tracking-wider">${trip.city}</span>
-                            <h3 class="text-lg font-extrabold text-slate-900 mt-0.5">${trip.title}</h3>
-                        </div>
-                        <span class="text-xs bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg font-medium">${trip.dates}</span>
-                    </div>
-                    
-                    <div class="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-100 text-slate-600">
-                        <div onclick="openHotelModal()" class="flex items-center space-x-2 bg-slate-50 hover:bg-blue-50/60 p-2.5 rounded-xl cursor-pointer transition-colors group">
-                            <i class="fa-solid fa-hotel text-blue-500"></i>
-                            <span class="truncate font-medium group-hover:text-blue-600">${trip.hotel}</span>
-                        </div>
-                        <div onclick="openFlightModal()" class="flex items-center space-x-2 bg-slate-50 hover:bg-indigo-50/60 p-2.5 rounded-xl cursor-pointer transition-colors group">
-                            <i class="fa-solid fa-plane text-indigo-500"></i>
-                            <span class="truncate font-medium group-hover:text-indigo-600">${trip.flightOut}</span>
-                        </div>
-                    </div>
-
-                    <!-- Sub Tab Switches -->
-                    <div class="flex border-b border-slate-200 text-xs pt-2 overflow-x-auto hide-scrollbar">
-                        <button onclick="setSubTab('timeline')" class="tab-btn pb-2.5 px-3.5 whitespace-nowrap ${currentTab === 'timeline' ? 'active' : 'text-slate-500'}">
-                            <i class="fa-solid fa-timeline mr-1"></i> 타임라인
-                        </button>
-                        <button onclick="setSubTab('category')" class="tab-btn pb-2.5 px-3.5 whitespace-nowrap ${currentTab === 'category' ? 'active' : 'text-slate-500'}">
-                            <i class="fa-solid fa-layer-group mr-1"></i> 카테고리 스크랩북
-                        </button>
-                        <button onclick="setSubTab('checklist')" class="tab-btn pb-2.5 px-3.5 whitespace-nowrap ${currentTab === 'checklist' ? 'active' : 'text-slate-500'}">
-                            <i class="fa-solid fa-list-check mr-1"></i> 체크리스트 (${(trip.checklists||[]).filter(c=>c.done).length}/${(trip.checklists||[]).length})
-                        </button>
-                        <button onclick="setSubTab('memo')" class="tab-btn pb-2.5 px-3.5 whitespace-nowrap ${currentTab === 'memo' ? 'active' : 'text-slate-500'}">
-                            <i class="fa-solid fa-note-sticky mr-1"></i> 메모장
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Tab Content: Timeline -->
-                ${currentTab === 'timeline' ? `
-                    <div class="space-y-4">
-                        <div class="flex justify-between items-center">
-                            <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider">Day-by-Day Itinerary</h4>
-                            <button onclick="openAddModal()" class="text-xs font-semibold text-blue-600 hover:underline flex items-center space-x-1">
-                                <i class="fa-solid fa-plus"></i><span>일정 추가</span>
-                            </button>
-                        </div>
-                        
-                        ${[1,2,3,4].map(day => {
-                            const dayItems = (trip.items || []).filter(i => i.day === day);
-                            if (dayItems.length === 0 && day > 2) return '';
-                            return `
-                                <div class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm space-y-3">
-                                    <div class="flex items-center justify-between pb-2 border-b border-slate-100">
-                                        <span class="text-xs font-black text-slate-800 bg-blue-50 text-blue-700 px-2.5 py-1 rounded-lg">Day ${day}</span>
-                                        <span class="text-xs text-slate-400">${dayItems.length}개의 일정</span>
-                                    </div>
-                                    <div class="space-y-3">
-                                        ${dayItems.length ? dayItems.map(item => `
-                                            <div onclick="openEditModal(${item.id})" class="flex items-start justify-between p-3 rounded-xl bg-slate-50/60 hover:bg-blue-50/50 border border-slate-100 cursor-pointer transition-all hover:border-blue-200 group">
-                                                <div class="flex items-start space-x-3 w-full">
-                                                    <span class="text-xs font-bold text-slate-400 mt-0.5 w-10 shrink-0">${item.time}</span>
-                                                    <div class="space-y-1 w-full">
-                                                        <div class="flex items-center space-x-2">
-                                                            <span class="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">${item.title}</span>
-                                                            <span class="text-[10px] px-2 py-0.5 rounded-md font-medium ${item.category === '맛집' ? 'bg-amber-100 text-amber-700' : item.category === '카페' ? 'bg-rose-100 text-rose-700' : item.category === '마사지' ? 'bg-teal-100 text-teal-700' : item.category === '이동' ? 'bg-indigo-100 text-indigo-700' : 'bg-emerald-100 text-emerald-700'}">${item.category}</span>
-                                                        </div>
-                                                        ${item.address ? `
-                                                            <div class="flex items-center space-x-1.5 text-xs text-slate-600 bg-white px-2 py-1 rounded-lg border border-slate-200/60 w-fit">
-                                                                <i class="fa-solid fa-location-dot text-rose-500 text-[11px]"></i>
-                                                                <span>${item.address}</span>
-                                                            </div>
-                                                        ` : ''}
-                                                        ${item.note ? `
-                                                            <div class="flex items-center space-x-1.5 text-xs text-slate-500 pt-0.5">
-                                                                <i class="fa-regular fa-comment-dots text-blue-500 text-[11px]"></i>
-                                                                <span>${item.note}</span>
-                                                            </div>
-                                                        ` : ''}
-                                                    </div>
-                                                </div>
-                                                <div class="text-slate-300 group-hover:text-blue-500 transition-colors pl-2 pt-1">
-                                                    <i class="fa-solid fa-pen-to-square text-xs"></i>
-                                                </div>
-                                            </div>
-                                        `).join('') : '<p class="text-xs text-slate-400 text-center py-2">등록된 일정이 없습니다.</p>'}
-                                    </div>
-                                </div>
-                            `;
-                        }).join('')}
-                    </div>
-                ` : currentTab === 'category' ? `
-                    <!-- Tab Content: Category Scrapbook -->
-                    <div class="space-y-4">
-                        <div class="flex justify-between items-center">
-                            <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider">카테고리별 장소 스크랩</h4>
-                            <button onclick="openAddModal()" class="text-xs font-semibold text-blue-600 hover:underline flex items-center space-x-1">
-                                <i class="fa-solid fa-plus"></i><span>장소 등록</span>
-                            </button>
-                        </div>
-
-                        <!-- Category Filter Chips -->
-                        <div class="flex items-center space-x-1.5 overflow-x-auto hide-scrollbar py-1">
-                            ${['전체', '맛집', '카페', '마사지', '관광', '쇼핑'].map(cat => `
-                                <button onclick="setCategoryFilter('${cat}')" class="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${selectedCategoryFilter === cat ? 'bg-slate-900 text-white shadow-sm' : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'}">
-                                    ${cat === '맛집' ? '🍲 맛집' : cat === '카페' ? '☕ 카페' : cat === '마사지' ? '💆‍♂️ 마사지' : cat === '관광' ? '🎡 관광' : cat === '쇼핑' ? '🛍️ 쇼핑' : '✨ 전체'}
-                                </button>
-                            `).join('')}
-                        </div>
-
-                        <!-- Category Items Cards -->
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            ${(() => {
-                                const filteredItems = (trip.items || []).filter(i => selectedCategoryFilter === '전체' || i.category === selectedCategoryFilter);
-                                if (filteredItems.length === 0) {
-                                    return `<div class="col-span-full bg-white rounded-2xl p-8 text-center text-slate-400 text-xs border border-slate-200/80">등록된 장소가 없습니다. 우측 상단 '장소 등록'으로 추가해 보세요!</div>`;
-                                }
-                                return filteredItems.map(item => `
-                                    <div onclick="openEditModal(${item.id})" class="bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm hover:border-blue-300 transition-all cursor-pointer space-y-2 relative group">
-                                        <div class="flex items-center justify-between">
-                                            <span class="text-xs font-bold ${item.category === '맛집' ? 'text-amber-600 bg-amber-50' : item.category === '카페' ? 'text-rose-600 bg-rose-50' : item.category === '마사지' ? 'text-teal-600 bg-teal-50' : item.category === '쇼핑' ? 'text-purple-600 bg-purple-50' : 'text-emerald-600 bg-emerald-50'} px-2.5 py-1 rounded-lg">
-                                                ${item.category === '맛집' ? '🍲 맛집' : item.category === '카페' ? '☕ 카페' : item.category === '마사지' ? '💆‍♂️ 마사지' : item.category === '쇼핑' ? '🛍️ 쇼핑' : '🎡 관광'}
-                                            </span>
-                                            <span class="text-[10px] text-slate-400 font-medium">${item.day ? item.day + '일차' : '스크랩'}</span>
-                                        </div>
-                                        <h5 class="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">${item.title}</h5>
-                                        ${item.address ? `
-                                            <p class="text-xs text-slate-500 flex items-center space-x-1 truncate">
-                                                <i class="fa-solid fa-location-dot text-rose-500 text-[10px]"></i>
-                                                <span>${item.address}</span>
-                                            </p>
-                                        ` : ''}
-                                        ${item.note ? `
-                                            <p class="text-xs text-slate-600 bg-slate-50 p-2 rounded-xl leading-relaxed">
-                                                💡 ${item.note}
-                                            </p>
-                                        ` : ''}
-                                    </div>
-                                `).join('');
-                            })()}
-                        </div>
-                    </div>
-                ` : currentTab === 'checklist' ? `
-                    <!-- Tab Content: Checklist -->
-                    <div class="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-4">
-                        <div class="flex justify-between items-center">
-                            <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider">준비물 & 체크리스트</h4>
-                            <span class="text-[10px] text-slate-400">항목 터치 시 수정/삭제 가능</span>
-                        </div>
-                        
-                        <div class="space-y-2">
-                            ${(trip.checklists || []).map(check => `
-                                <div onclick="openEditChecklistModal(${check.id})" class="flex items-center justify-between p-3.5 rounded-2xl border ${check.done ? 'bg-slate-50 border-slate-200 text-slate-400 line-through' : 'bg-white border-slate-200/80 text-slate-800'} cursor-pointer hover:border-blue-300 transition-all group">
-                                    <div class="flex items-center space-x-3 text-sm font-medium w-full pr-2">
-                                        <i class="fa-solid fa-pen text-xs text-slate-300 group-hover:text-blue-500 transition-colors shrink-0"></i>
-                                        <span class="truncate">${check.text}</span>
-                                    </div>
-                                    <div onclick="toggleChecklist(${check.id}, event)" class="w-6 h-6 rounded-lg border ${check.done ? 'bg-blue-600 border-blue-600 text-white' : 'border-slate-300 hover:border-blue-400'} flex items-center justify-center text-xs shrink-0 transition-colors">
-                                        ${check.done ? '<i class="fa-solid fa-check"></i>' : ''}
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-
-                        <div class="pt-2">
-                            <input type="text" onkeydown="addChecklistItem(event)" placeholder="+ 준비물 항목 추가 후 Enter" class="w-full px-3.5 py-2.5 text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        </div>
-                    </div>
-                ` : `
-                    <!-- Tab Content: Cloud Memo -->
-                    <div class="bg-white rounded-3xl p-5 border border-slate-200/80 shadow-sm space-y-4">
-                        <div class="flex justify-between items-center">
-                            <h4 class="text-xs font-bold text-slate-500 uppercase tracking-wider">실시간 공유 메모장</h4>
-                            <span class="text-[10px] text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md font-medium">자동 동기화 지원</span>
-                        </div>
-                        
-                        <p class="text-xs text-slate-500">여행 관련 꿀팁, 택시 기사님께 보여줄 중국어 주소, 공유할 정보 등을 자유롭게 적어두세요.</p>
-
-                        <textarea id="tripMemoInput" rows="8" placeholder="예: 택시 탈 때 '请带 me 去...' 라고 말하기" class="w-full p-4 text-sm rounded-2xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed text-slate-800 font-sans">${trip.memoText || ''}</textarea>
-
-                        <button onclick="saveTripMemo()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl shadow-md shadow-blue-500/20 transition-all text-xs flex items-center justify-center space-x-2">
-                            <i class="fa-solid fa-floppy-disk"></i>
-                            <span>메모 클라우드에 저장하기</span>
-                        </button>
-                    </div>
-                `}
-            `;
-        }
-
-        function render() {
-            renderStats();
-            renderTabs();
-            renderMainContent();
-        }
-    </script>
-</body>
-</html>
+            const map
